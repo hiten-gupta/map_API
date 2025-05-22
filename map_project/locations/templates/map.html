@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Map with Search</title>
+    <meta charset="utf-8" />
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.Default.css" />
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+
+        #search-container {
+            margin-bottom: 10px;
+        }
+
+        #search {
+            width: 300px;
+            padding: 8px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+            transition: 0.2s;
+        }
+
+        #search:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 2px 6px rgba(0,123,255,0.4);
+        }
+
+        #map {
+            height: 500px;
+            margin-top: 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+
+        #stats {
+            margin-top: 10px;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Interactive Map Search</h1>
+
+    <div id="search-container">
+        <input type="text" id="search" placeholder="Search location name..." />
+    </div>
+
+    <div id="map"></div>
+    <div id="stats"></div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster/dist/leaflet.markercluster.js"></script>
+
+    <script>
+        const map = L.map('map').setView([20, 77], 5);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        const markerCluster = L.markerClusterGroup();
+        const allMarkers = [];
+
+        // Fetch and display markers
+        fetch('/api/geojson/')
+            .then(res => res.json())
+            .then(data => {
+                data.features.forEach(feature => {
+                    const [lon, lat] = feature.geometry.coordinates;
+                    const name = feature.properties.name;
+                    const category = feature.properties.category;
+
+                    const marker = L.marker([lat, lon])
+                        .bindPopup(`<strong>${name}</strong><br>${category}`);
+                    marker.name = name.toLowerCase();
+
+                    allMarkers.push(marker);
+                    markerCluster.addLayer(marker);
+                });
+
+                map.addLayer(markerCluster);
+            });
+
+        // Fetch and show stats
+        fetch('/api/stats/')
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('stats').innerText =
+                    `Total: ${data.total_locations}, Most Common: ${data.most_common_category}`;
+            });
+
+        // 🔍 Search functionality
+        document.getElementById('search').addEventListener('input', function () {
+            const query = this.value.toLowerCase();
+            markerCluster.clearLayers(); // remove all
+
+            if (query === '') {
+                // Show all markers
+                allMarkers.forEach(m => markerCluster.addLayer(m));
+            } else {
+                // Filtered markers
+                allMarkers
+                    .filter(m => m.name.includes(query))
+                    .forEach(m => markerCluster.addLayer(m));
+            }
+        });
+    </script>
+
+</body>
+</html>
